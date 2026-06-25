@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realm 规则生成器</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --success-hover: #059669;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --warning: #f59e0b;
+            --warning-hover: #d97706;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --input-focus: rgba(37, 99, 235, 0.15);
+            --rule-bg: #f8fafc;
+            --rule-hover: #f1f5f9;
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --radius-sm: 6px;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            --terminal-bg: #0f172a;
+            --terminal-border: #1e293b;
+            --terminal-header: #1e293b;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --input-bg: #1e293b;
+            --input-border: #475569;
+            --input-focus: rgba(37, 99, 235, 0.3);
+            --rule-bg: #1e293b;
+            --rule-hover: #1e293b;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            --terminal-bg: #020617;
+            --terminal-border: #334155;
+            --terminal-header: #0f172a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); padding: 40px 20px; color: var(--text); line-height: 1.5; transition: background-color 0.3s, color 0.3s; }
+        
+        .container { max-width: 950px; margin: 0 auto; background: var(--card-bg); border-radius: var(--radius-lg); padding: 35px 40px; box-shadow: var(--shadow); border: 1px solid var(--border); transition: var(--transition); }
+        
+        .header-area { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; flex-wrap: wrap; gap: 16px; }
+        h1 { font-size: 28px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .sub { color: var(--text-muted); font-size: 14px; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+        
+        .section { background: var(--card-bg); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px; border: 1px solid var(--border); transition: var(--transition); }
+        .section:hover { border-color: #cbd5e1; }
+        [data-theme="dark"] .section:hover { border-color: #475569; }
+        .section-title { font-weight: 600; font-size: 16px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; letter-spacing: 0.5px; }
+        .section-title span { display: flex; align-items: center; gap: 8px; }
+
+        .form-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin-bottom: 12px; }
+        .form-row label { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 14px; color: var(--text-muted); cursor: pointer; user-select: none; }
+        
+        input[type="text"], select, textarea { padding: 8px 14px; border: 1px solid var(--input-border); border-radius: var(--radius-sm); font-size: 14px; color: var(--text); background-color: var(--input-bg); outline: none; transition: var(--transition); width: 100%; }
+        input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--input-focus); }
+        input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+        
+        /* 错误验证状态 */
+        input.invalid-field { border-color: var(--danger) !important; background-color: rgba(239, 68, 68, 0.05) !important; }
+        input.invalid-field:focus { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important; }
+
+        /* 规则卡片设计 */
+        .rule-item { background: var(--rule-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; margin-bottom: 16px; position: relative; transition: var(--transition); display: flex; flex-direction: column; }
+        [data-theme="light"] .rule-item:hover { border-color: #cbd5e1; background: var(--rule-hover); }
+        
+        .rule-fields { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; }
+        .rule-group { display: flex; align-items: center; gap: 10px; }
+        .rule-group .addr-label { font-weight: 600; font-size: 13px; color: var(--text-muted); width: 34px; text-align: right; }
+        
+        /* 联合输入框组 */
+        .input-combined { display: flex; align-items: center; border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--input-bg); overflow: hidden; transition: var(--transition); }
+        .input-combined:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--input-focus); }
+        .input-combined input { border: none !important; padding: 8px 12px; border-radius: 0 !important; box-shadow: none !important; background: transparent; color: var(--text); }
+        .input-combined input.addr-field { width: 150px; }
+        .input-combined input.port-field { width: 85px; text-align: center; border-left: 1px solid var(--border) !important; background: rgba(0,0,0,0.02); color: #0284c7; font-weight: 500; }
+        [data-theme="dark"] .input-combined input.port-field { color: #38bdf8; background: rgba(255,255,255,0.02); }
+
+        /* 额外远程样式 */
+        .extra-remotes { margin-top: 14px; padding-top: 12px; padding-left: 14px; border-left: 3px solid var(--border); }
+        .extra-item-container { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .extra-item { display: flex; align-items: center; gap: 10px; }
+        .extra-item .input-combined input.addr-field { width: 140px; }
+        .extra-item .input-combined input.port-field { width: 80px; }
+        
+        /* 负载均衡配置 */
+        .bal-container { display: flex; align-items: center; gap: 12px; margin-top: 12px; background: var(--input-bg); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px dashed var(--border); font-size: 13px; width: max-content; flex-wrap: wrap; }
+        .bal-container label { font-weight: 500; color: var(--text-muted); }
+        .bal-container select { width: 130px; padding: 4px 8px; font-size: 13px; }
+        .bal-container input { width: 90px; padding: 4px 8px; font-size: 13px; text-align: center; }
+
+        /* 按钮体系 */
+        .btn { padding: 8px 16px; border: none; border-radius: var(--radius-sm); font-weight: 500; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); user-select: none; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--border); color: var(--text); }
+        .btn-secondary:hover { background: rgba(0,0,0,0.1); }
+        [data-theme="dark"] .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: var(--danger-hover); }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-success:hover { background: var(--success-hover); }
+        .btn-warning { background: var(--warning); color: #fff; }
+        .btn-warning:hover { background: var(--warning-hover); }
+        .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 4px; }
+        .btn-group { display: flex; flex-wrap: wrap; gap: 10px; }
+        
+        .rule-item .del-rule { align-self: flex-end; background: rgba(239, 68, 68, 0.1); border: none; color: var(--danger); border-radius: var(--radius-sm); padding: 5px 14px; cursor: pointer; font-size: 12px; font-weight: 500; margin-top: 14px; transition: var(--transition); }
+        .rule-item .del-rule:hover { background: var(--danger); color: #fff; }
+        .del-extra-btn { background: var(--border); border: none; color: var(--text-muted); font-size: 12px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; transition: var(--transition); }
+        .del-extra-btn:hover { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        /* 批量导入导出面板 */
+        .io-panel { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
+        .io-panel.active { display: block; }
+        .io-textarea { font-family: monospace; height: 100px; resize: vertical; margin-bottom: 10px; }
+
+        /* 终端命令盒子 */
+        .cmd-box { background: var(--terminal-bg); color: #e2e8f0; border-radius: var(--radius-md); border: 1px solid var(--terminal-border); overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .cmd-box .cmd-header { display: flex; justify-content: space-between; align-items: center; background: var(--terminal-header); padding: 12px 20px; border-bottom: 1px solid var(--terminal-border); }
+        .cmd-box .cmd-header span { font-weight: 600; font-size: 13px; color: #94a3b8; letter-spacing: 0.5px; }
+        .cmd-box .btn-copy-all { background: #334155; border: none; color: #e2e8f0; padding: 5px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 500; cursor: pointer; transition: var(--transition); }
+        .cmd-box .btn-copy-all:hover { background: #475569; color: #fff; }
+        
+        .cmd-holder { padding: 10px 20px; }
+        .cmd-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--terminal-border); gap: 16px; }
+        .cmd-item:last-child { border-bottom: none; }
+        .cmd-item .cmd-text { font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; flex: 1; color: #38bdf8; padding-top: 2px; }
+        .cmd-item .cmd-copy-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 4px 12px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 500; cursor: pointer; flex-shrink: 0; transition: var(--transition); }
+        .cmd-item .cmd-copy-btn:hover { background: #334155; color: #fff; border-color: #475569; }
+        .cmd-empty { color: #475569; font-style: italic; font-size: 13px; text-align: center; padding: 20px 0; width: 100%; }
+
+        .delete-section { border-top: 1px dashed var(--border); }
+
+        /* 隐藏的文件输入框 */
+        #import-file-input { display: none; }
+
+        @media (max-width: 768px) {
+            body { padding: 16px 10px; }
+            .container { padding: 20px; }
+            .rule-fields { flex-direction: column; align-items: stretch; gap: 12px; }
+            .rule-group { width: 100%; }
+            .rule-group .input-combined { flex: 1; }
+            .input-combined input.addr-field { flex: 1; width: auto; }
+            .form-row { flex-direction: column; align-items: stretch; gap: 12px; }
+            .form-row input[type="text"] { width: 100% !important; }
+            .cmd-item { flex-direction: column; align-items: stretch; gap: 8px; }
+            .cmd-item .cmd-copy-btn { align-self: flex-end; }
+            .bal-container { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header-area">
+        <h1>🔁 Realm 规则生成器</h1>
+        <button class="btn btn-secondary btn-sm" id="theme-toggle">🌓 切换主题</button>
+    </div>
+    <div class="sub">可视化的 Realm 配置面板。</div>
+
+    <div class="section">
+        <div class="section-title">📦 管理 Realm 服务</div>
+        <div class="btn-group">
+            <button class="btn btn-warning" id="gen-install">⚙️ 安装 Realm</button>
+            <button class="btn btn-primary" id="gen-update">🔄 更新 Realm</button>
+            <button class="btn btn-danger" id="gen-uninstall">🗑️ 卸载 Realm</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">🌐 全局网络配置</div>
+        <div class="form-row">
+            <label><input type="checkbox" id="enable_tcp" checked> 启用 TCP 协议</label>
+            <label><input type="checkbox" id="enable_udp" checked> 启用 UDP 协议</label>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">
+            <span>📋 转发规则配置</span>
+            <div class="btn-group">
+                <button class="btn btn-secondary btn-sm" id="toggle-io-btn">⚡ 批量粘贴/高级功能</button>
+            </div>
+        </div>
+
+        <div class="io-panel" id="io-panel">
+            <textarea class="io-textarea" id="bulk-paste-area" placeholder="【多行文本快捷解析导入】格式支持：&#10;监听端口:目标IP:目标端口  (默认监听 0.0.0.0)&#10;监听IP:监听端口:目标IP:目标端口&#10;10005:1.2.3.4:20005&#10;127.0.0.1:10006:8.8.8.8:53"></textarea>
+            <div class="btn-group">
+                <button class="btn btn-success btn-sm" id="btn-parse-bulk">解析并载入多行文本</button>
+                <button class="btn btn-primary btn-sm" id="btn-export-json">导出备份 JSON 文件</button>
+                <button class="btn btn-primary btn-sm" id="btn-import-json-trigger">导入 JSON 配置文件</button>
+                <input type="file" id="import-file-input" accept=".json">
+            </div>
+        </div>
+
+        <div id="rules-container" style="margin-top: 14px;"></div>
+        <div style="margin-top: 16px;">
+            <button class="btn btn-success" id="add-rule-btn">➕ 添加一条转发规则映射</button>
+        </div>
+        <div class="form-row" style="margin-top:16px; padding-top:12px; border-top: 1px solid var(--border);">
+            <label><input type="checkbox" id="clear_rules" checked> 清空现有配置规则后添加</label>
+        </div>
+    </div>
+
+    <div class="section delete-section">
+        <div class="section-title">🗑️ 批量删除规则</div>
+        <div class="form-row">
+            <label style="flex-direction: column; align-items: flex-start; gap: 6px; width: 100%;">
+                <span style="font-size: 13px; color: var(--text-muted);">输入要移除的监听端口（支持逗号分隔或连字符范围，如：10001,10002,20001-20002）</span>
+                <input type="text" id="delete-port" placeholder="示例: 10001,20000-20010" style="max-width:400px;">
+            </label>
+        </div>
+    </div>
+
+    <div style="margin-top:28px;">
+        <div class="cmd-box" id="cmd-output">
+            <div class="cmd-header">
+                <span>TERMINAL COMMAND GENERATED</span>
+                <button class="btn-copy-all" id="copy-all-btn">📋 复制全部指令</button>
+            </div>
+            <div class="cmd-holder" id="cmd-list">
+                </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        let rules = [];
+        let currentManagementCmd = '';
+
+        const RULES_CONTAINER = document.getElementById('rules-container');
+        const CMD_LIST = document.getElementById('cmd-list');
+
+        const savedTheme = localStorage.getItem('realm_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            const target = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', target);
+            localStorage.setItem('realm_theme', target);
+        });
+
+        document.getElementById('toggle-io-btn').addEventListener('click', () => {
+            const panel = document.getElementById('io-panel');
+            panel.classList.toggle('active');
+        });
+
+        function isValidPort(portStr) {
+            const p = parseInt(portStr.trim(), 10);
+            return !isNaN(p) && p >= 1 && p <= 65535 && String(p) === portStr.trim();
+        }
+        function isValidAddr(addrStr) {
+            const a = addrStr.trim();
+            if(!a) return false;
+            if(a.includes(' ') || a.includes('\n')) return false;
+            return true;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        function joinAddrPort(addr, port) {
+            addr = addr.trim();
+            port = port.trim();
+            if (!addr) return '';
+            if (!port) return addr;
+            if (addr.includes(':')) return `[${addr}]:${port}`;
+            return `${addr}:${port}`;
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('realm_rules_data', JSON.stringify(rules));
+            localStorage.setItem('realm_setting_tcp', document.getElementById('enable_tcp').checked);
+            localStorage.setItem('realm_setting_udp', document.getElementById('enable_udp').checked);
+            localStorage.setItem('realm_setting_clear', document.getElementById('clear_rules').checked);
+            localStorage.setItem('realm_setting_del_port', document.getElementById('delete-port').value);
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const storedRules = localStorage.getItem('realm_rules_data');
+                if (storedRules) rules = JSON.parse(storedRules);
+                
+                if(localStorage.getItem('realm_setting_tcp') !== null) 
+                    document.getElementById('enable_tcp').checked = localStorage.getItem('realm_setting_tcp') === 'true';
+                if(localStorage.getItem('realm_setting_udp') !== null) 
+                    document.getElementById('enable_udp').checked = localStorage.getItem('realm_setting_udp') === 'true';
+                if(localStorage.getItem('realm_setting_clear') !== null) 
+                    document.getElementById('clear_rules').checked = localStorage.getItem('realm_setting_clear') === 'true';
+                if(localStorage.getItem('realm_setting_del_port') !== null) 
+                    document.getElementById('delete-port').value = localStorage.getItem('realm_setting_del_port');
+            } catch(e) {
+                console.error("加载缓存数据失败，已重置", e);
+            }
+        }
+
+        function renderRules() {
+            RULES_CONTAINER.innerHTML = '';
+            rules.forEach((rule, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'rule-item';
+
+                const fieldsDiv = document.createElement('div');
+                fieldsDiv.className = 'rule-fields';
+
+                // 1. 监听端组件设计
+                const listenGroup = document.createElement('div');
+                listenGroup.className = 'rule-group';
+                
+                const listenLabel = document.createElement('span');
+                listenLabel.className = 'addr-label';
+                listenLabel.textContent = '监听';
+                
+                const listenCombined = document.createElement('div');
+                listenCombined.className = 'input-combined';
+                
+                const listenAddrInp = document.createElement('input');
+                listenAddrInp.type = 'text';
+                listenAddrInp.className = 'addr-field';
+                listenAddrInp.value = rule.listen_addr || '0.0.0.0';
+                listenAddrInp.placeholder = '0.0.0.0';
+                
+                const listenPortInp = document.createElement('input');
+                listenPortInp.type = 'text';
+                listenPortInp.className = 'port-field';
+                listenPortInp.value = rule.listen_port || '';
+                listenPortInp.placeholder = '端口';
+                
+                if(rule.listen_port && !isValidPort(rule.listen_port)) listenPortInp.classList.add('invalid-field');
+                if(rule.listen_addr && !isValidAddr(rule.listen_addr)) listenAddrInp.classList.add('invalid-field');
+
+                listenCombined.appendChild(listenAddrInp);
+                listenCombined.appendChild(listenPortInp);
+                listenGroup.appendChild(listenLabel);
+                listenGroup.appendChild(listenCombined);
+                fieldsDiv.appendChild(listenGroup);
+
+                // 2. 远端出口组件设计
+                const remoteGroup = document.createElement('div');
+                remoteGroup.className = 'rule-group';
+                
+                const remoteLabel = document.createElement('span');
+                remoteLabel.className = 'addr-label';
+                remoteLabel.textContent = '远程';
+                
+                const remoteCombined = document.createElement('div');
+                remoteCombined.className = 'input-combined';
+                
+                const remoteAddrInp = document.createElement('input');
+                remoteAddrInp.type = 'text';
+                remoteAddrInp.className = 'addr-field';
+                remoteAddrInp.value = rule.remote_addr || '';
+                remoteAddrInp.placeholder = '目标 IP/域名';
+                
+                const remotePortInp = document.createElement('input');
+                remotePortInp.type = 'text';
+                remotePortInp.className = 'port-field';
+                remotePortInp.value = rule.remote_port || '';
+                remotePortInp.placeholder = '端口';
+                
+                if(rule.remote_port && !isValidPort(rule.remote_port)) remotePortInp.classList.add('invalid-field');
+                if(rule.remote_addr && !isValidAddr(rule.remote_addr)) remoteAddrInp.classList.add('invalid-field');
+
+                remoteCombined.appendChild(remoteAddrInp);
+                remoteCombined.appendChild(remotePortInp);
+                remoteGroup.appendChild(remoteLabel);
+                remoteGroup.appendChild(remoteCombined);
+                fieldsDiv.appendChild(remoteGroup);
+
+                itemDiv.appendChild(fieldsDiv);
+
+                // 3. 负载均衡模块
+                const extraDiv = document.createElement('div');
+                extraDiv.className = 'extra-remotes';
+
+                const hasExtraCheck = rule._hasExtra || false;
+                const extras = rule.extra_remotes || [];
+
+                const checkLabel = document.createElement('label');
+                checkLabel.style.cursor = 'pointer';
+                checkLabel.style.fontSize = '13px';
+                
+                const checkBox = document.createElement('input');
+                checkBox.type = 'checkbox';
+                checkBox.checked = hasExtraCheck;
+                checkBox.addEventListener('change', function() {
+                    rules[index]._hasExtra = this.checked;
+                    saveToLocalStorage();
+                    renderRules();
+                    updateAllCommands();
+                });
+
+                checkLabel.appendChild(checkBox);
+                checkLabel.appendChild(document.createTextNode(' 开启多端负载均衡 (添加额外远程从节点)'));
+                extraDiv.appendChild(checkLabel);
+
+                const extraListDiv = document.createElement('div');
+                extraListDiv.style.display = hasExtraCheck ? 'block' : 'none';
+                extraListDiv.style.marginTop = '8px';
+
+                const addExtraBtn = document.createElement('button');
+                addExtraBtn.className = 'btn btn-secondary btn-sm';
+                addExtraBtn.textContent = '➕ 添加多路由从节点';
+                addExtraBtn.onclick = (e) => {
+                    e.preventDefault();
+                    if (!rules[index].extra_remotes) rules[index].extra_remotes = [];
+                    rules[index].extra_remotes.push({ addr: '', port: '' });
+                    rules[index]._hasExtra = true;
+                    saveToLocalStorage();
+                    renderRules();
+                    updateAllCommands();
+                };
+                extraListDiv.appendChild(addExtraBtn);
+
+                const extraItemContainer = document.createElement('div');
+                extraItemContainer.className = 'extra-item-container';
+                
+                extras.forEach((item, ei) => {
+                    const itemDivChild = document.createElement('div');
+                    itemDivChild.className = 'extra-item';
+
+                    const childCombined = document.createElement('div');
+                    childCombined.className = 'input-combined';
+
+                    const childAddrInp = document.createElement('input');
+                    childAddrInp.type = 'text';
+                    childAddrInp.className = 'addr-field';
+                    childAddrInp.value = item.addr || '';
+                    childAddrInp.placeholder = '从节点 IP';
+
+                    const childPortInp = document.createElement('input');
+                    childPortInp.type = 'text';
+                    childPortInp.className = 'port-field';
+                    childPortInp.value = item.port || '';
+                    childPortInp.placeholder = '端口';
+
+                    if(item.port && !isValidPort(item.port)) childPortInp.classList.add('invalid-field');
+                    if(item.addr && !isValidAddr(item.addr)) childAddrInp.classList.add('invalid-field');
+
+                    const delExtraBtn = document.createElement('button');
+                    delExtraBtn.className = 'del-extra-btn';
+                    delExtraBtn.textContent = '✕';
+                    delExtraBtn.onclick = (e) => {
+                        e.preventDefault();
+                        rules[index].extra_remotes.splice(ei, 1);
+                        if (rules[index].extra_remotes.length === 0) {
+                            rules[index].balance = undefined;
+                        }
+                        saveToLocalStorage();
+                        renderRules();
+                        updateAllCommands();
+                    };
+
+                    const updateExtra = () => {
+                        rules[index].extra_remotes[ei].addr = childAddrInp.value.trim();
+                        rules[index].extra_remotes[ei].port = childPortInp.value.trim();
+                        saveToLocalStorage();
+                        updateAllCommands();
+                        
+                        if(childPortInp.value && !isValidPort(childPortInp.value)) childPortInp.classList.add('invalid-field');
+                        else childPortInp.classList.remove('invalid-field');
+                        if(childAddrInp.value && !isValidAddr(childAddrInp.value)) childAddrInp.classList.add('invalid-field');
+                        else childAddrInp.classList.remove('invalid-field');
+                    };
+                    childAddrInp.addEventListener('input', updateExtra);
+                    childPortInp.addEventListener('input', updateExtra);
+                    
+                    childAddrInp.addEventListener('keydown', handleEnterKey);
+                    childPortInp.addEventListener('keydown', handleEnterKey);
+
+                    childCombined.appendChild(childAddrInp);
+                    childCombined.appendChild(childPortInp);
+                    itemDivChild.appendChild(childCombined);
+                    itemDivChild.appendChild(delExtraBtn);
+                    extraItemContainer.appendChild(itemDivChild);
+                });
+                extraListDiv.appendChild(extraItemContainer);
+
+                // 负载均衡策略组
+                if (extras.length > 0) {
+                    const balDiv = document.createElement('div');
+                    balDiv.className = 'bal-container';
+                    
+                    const strategyVal = (rule.balance && rule.balance.strategy) || 'roundrobin';
+                    const weightsVal = (rule.balance && rule.balance.weights) || '1';
+
+                    balDiv.innerHTML = `
+                        <label>轮询策略</label>
+                        <select class="bal-strategy">
+                            <option value="roundrobin">roundrobin (简单轮询)</option>
+                            <option value="iphash">iphash (源IP固定哈希)</option>
+                        </select>
+                        <label style="margin-left:8px;">权重配置</label>
+                        <input type="text" class="bal-weights" placeholder="例如: 1,1,1">
+                    `;
+                    
+                    const strategySel = balDiv.querySelector('.bal-strategy');
+                    strategySel.value = strategyVal;
+                    const weightsInp = balDiv.querySelector('.bal-weights');
+                    weightsInp.value = weightsVal;
+
+                    const updateBal = () => {
+                        rules[index].balance = {
+                            strategy: strategySel.value,
+                            weights: weightsInp.value.trim() || '1'
+                        };
+                        saveToLocalStorage();
+                        updateAllCommands();
+                    };
+                    strategySel.addEventListener('change', updateBal);
+                    weightsInp.addEventListener('input', updateBal);
+
+                    extraListDiv.appendChild(balDiv);
+                }
+
+                extraDiv.appendChild(extraListDiv);
+                itemDiv.appendChild(extraDiv);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'del-rule';
+                delBtn.textContent = '✕ 移除此条映射';
+                delBtn.onclick = () => {
+                    rules.splice(index, 1);
+                    saveToLocalStorage();
+                    renderRules();
+                    updateAllCommands();
+                };
+                itemDiv.appendChild(delBtn);
+
+                const updateRule = () => {
+                    rules[index].listen_addr = listenAddrInp.value.trim() || '0.0.0.0';
+                    rules[index].listen_port = listenPortInp.value.trim();
+                    rules[index].remote_addr = remoteAddrInp.value.trim();
+                    rules[index].remote_port = remotePortInp.value.trim();
+
+                    if(listenPortInp.value && !isValidPort(listenPortInp.value)) listenPortInp.classList.add('invalid-field');
+                    else listenPortInp.classList.remove('invalid-field');
+                    
+                    if(remotePortInp.value && !isValidPort(remotePortInp.value)) remotePortInp.classList.add('invalid-field');
+                    else remotePortInp.classList.remove('invalid-field');
+
+                    if(listenAddrInp.value && !isValidAddr(listenAddrInp.value)) listenAddrInp.classList.add('invalid-field');
+                    else listenAddrInp.classList.remove('invalid-field');
+
+                    if(remoteAddrInp.value && !isValidAddr(remoteAddrInp.value)) remoteAddrInp.classList.add('invalid-field');
+                    else remoteAddrInp.classList.remove('invalid-field');
+
+                    saveToLocalStorage();
+                    updateAllCommands();
+                };
+
+                listenAddrInp.addEventListener('input', updateRule);
+                listenPortInp.addEventListener('input', updateRule);
+                remoteAddrInp.addEventListener('input', updateRule);
+                remotePortInp.addEventListener('input', updateRule);
+
+                listenAddrInp.addEventListener('keydown', handleEnterKey);
+                listenPortInp.addEventListener('keydown', handleEnterKey);
+                remoteAddrInp.addEventListener('keydown', handleEnterKey);
+                remotePortInp.addEventListener('keydown', handleEnterKey);
+
+                RULES_CONTAINER.appendChild(itemDiv);
+            });
+        }
+
+        function handleEnterKey(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('add-rule-btn').click();
+                setTimeout(() => {
+                    const allPortFields = RULES_CONTAINER.querySelectorAll('.port-field');
+                    if (allPortFields.length > 0) {
+                        allPortFields[allPortFields.length - 1].focus();
+                    }
+                }, 50);
+            }
+        }
+
+        document.getElementById('add-rule-btn').addEventListener('click', () => {
+            rules.push({
+                listen_addr: '0.0.0.0',
+                listen_port: '',
+                remote_addr: '',
+                remote_port: '',
+                extra_remotes: [],
+                _hasExtra: false,
+                balance: undefined
+            });
+            saveToLocalStorage();
+            renderRules();
+            updateAllCommands();
+        });
+
+        function generateAddCommand() {
+            const includeClear = document.getElementById('clear_rules').checked;
+            const enableTcp = document.getElementById('enable_tcp').checked;
+            const enableUdp = document.getElementById('enable_udp').checked;
+
+            const validRules = rules.filter(r => {
+                const listen = joinAddrPort(r.listen_addr, r.listen_port);
+                const remote = joinAddrPort(r.remote_addr, r.remote_port);
+                return listen && remote && isValidPort(r.listen_port) && isValidPort(r.remote_port);
+            });
+            if (validRules.length === 0) return '';
+
+            const endpoints = validRules.map(r => {
+                const listen = joinAddrPort(r.listen_addr, r.listen_port);
+                const remote = joinAddrPort(r.remote_addr, r.remote_port);
+                const ep = { listen, remote };
+                if (r.extra_remotes && r.extra_remotes.length > 0) {
+                    const filtered = r.extra_remotes
+                        .filter(item => item.addr && item.port && isValidPort(item.port))
+                        .map(item => joinAddrPort(item.addr, item.port));
+                    if (filtered.length > 0) {
+                        ep.extra_remotes = filtered;
+                        if (r.balance && r.balance.weights && r.balance.weights.trim() !== '') {
+                            ep.balance = `${r.balance.strategy}: ${r.balance.weights}`;
+                        }
+                    }
+                }
+                return ep;
+            });
+            const endpointsJson = JSON.stringify(endpoints);
+            const clearFlag = includeClear ? 'true' : 'false';
+
+            let envVars = `XM_ACTION=add XM_CLEAR=${clearFlag}`;
+            envVars += ` ENABLE_TCP=${enableTcp} ENABLE_UDP=${enableUdp}`;
+            envVars += ` XM_ADD_JSON='${endpointsJson}'`;
+            return `${envVars} bash <(curl -Ls https://raw.githubusercontent.com/hellooe/realm-x/refs/heads/master/xm.sh)`;
+        }
+
+        function generateDeleteCmd() {
+            const port = document.getElementById('delete-port').value.trim();
+            if (!port) return '';
+            return `XM_ACTION=delete XM_DELETE_PORT="${port}" bash <(curl -Ls https://raw.githubusercontent.com/hellooe/realm-x/refs/heads/master/xm.sh)`;
+        }
+
+        function generateActionCmd(action) {
+            return `XM_ACTION=${action} bash <(curl -Ls https://raw.githubusercontent.com/hellooe/realm-x/refs/heads/master/xm.sh)`;
+        }
+
+        function updateAllCommands() {
+            const addCmd = generateAddCommand();
+            const delCmd = generateDeleteCmd();
+
+            let items = [];
+            if (currentManagementCmd) items.push({ label: '管理', cmd: currentManagementCmd });
+            if (addCmd) items.push({ label: '添加', cmd: addCmd });
+            if (delCmd) items.push({ label: '删除', cmd: delCmd });
+
+            if (items.length === 0) {
+                CMD_LIST.innerHTML = '';
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'cmd-empty';
+                emptyDiv.textContent = '💡 暂无生成的执行命令。请在上方输入完整的端口和映射数据，错误的端口格式会被自动忽略。';
+                CMD_LIST.appendChild(emptyDiv);
+                return;
+            }
+
+            CMD_LIST.innerHTML = '';
+            items.forEach((item) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'cmd-item';
+
+                const textSpan = document.createElement('span');
+                textSpan.className = 'cmd-text';
+                textSpan.textContent = item.cmd; 
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'cmd-copy-btn';
+                copyBtn.textContent = '📋 复制';
+                copyBtn.setAttribute('data-raw-cmd', item.cmd);
+                copyBtn.addEventListener('click', function() {
+                    copyToClipboard(this.getAttribute('data-raw-cmd'), this);
+                });
+
+                itemDiv.appendChild(textSpan);
+                itemDiv.appendChild(copyBtn);
+                CMD_LIST.appendChild(itemDiv);
+            });
+        }
+
+        function copyToClipboard(text, element) {
+            const doVisualFeedback = () => {
+                if (element) {
+                    const originText = element.innerHTML;
+                    element.innerHTML = '✓ 已复制';
+                    element.style.borderColor = 'var(--success)';
+                    element.style.color = 'var(--success)';
+                    setTimeout(() => {
+                        element.innerHTML = originText;
+                        element.style.borderColor = '';
+                        element.style.color = '';
+                    }, 1500);
+                }
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(doVisualFeedback).catch(() => fallbackCopy(text, doVisualFeedback));
+            } else {
+                fallbackCopy(text, doVisualFeedback);
+            }
+        }
+
+        function fallbackCopy(text, callback) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try { document.execCommand('copy'); callback(); } catch (err) { console.error('复制失败', err); }
+            document.body.removeChild(textarea);
+        }
+
+        // ⚡ 核心高级功能 1：多行任意文本智能批量切分载入
+        document.getElementById('btn-parse-bulk').addEventListener('click', () => {
+            const rawText = document.getElementById('bulk-paste-area').value.trim();
+            if(!rawText) return;
+
+            const lines = rawText.split('\n');
+            let newlyAddedCount = 0;
+
+            lines.forEach(line => {
+                const cleanLine = line.trim();
+                if(!cleanLine) return;
+                
+                // 依据冒号切分段数
+                const segments = cleanLine.split(':');
+                if(segments.length === 3) {
+                    // 格式： 监听端口:目标IP:目标端口
+                    rules.push({
+                        listen_addr: '0.0.0.0',
+                        listen_port: segments[0].trim(),
+                        remote_addr: segments[1].trim(),
+                        remote_port: segments[2].trim(),
+                        extra_remotes: [],
+                        _hasExtra: false,
+                        balance: undefined
+                    });
+                    newlyAddedCount++;
+                } else if(segments.length === 4) {
+                    // 格式： 监听IP:监听端口:目标IP:目标端口
+                    rules.push({
+                        listen_addr: segments[0].trim(),
+                        listen_port: segments[1].trim(),
+                        remote_addr: segments[2].trim(),
+                        remote_port: segments[3].trim(),
+                        extra_remotes: [],
+                        _hasExtra: false,
+                        balance: undefined
+                    });
+                    newlyAddedCount++;
+                }
+            });
+
+            if(newlyAddedCount > 0) {
+                document.getElementById('bulk-paste-area').value = '';
+                document.getElementById('io-panel').classList.remove('active');
+                saveToLocalStorage();
+                renderRules();
+                updateAllCommands();
+            } else {
+                alert('未识别到有效格式，请检查粘贴的内容是否满足 [端口:IP:端口] 规范');
+            }
+        });
+
+        // ⚡ 核心高级功能 2：标准 JSON 配置文件物理导出
+        document.getElementById('btn-export-json').addEventListener('click', () => {
+            if(rules.length === 0) { alert('当前没有配置可供导出备份'); return; }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rules, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `realm_rules_backup_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        });
+
+        // ⚡ 核心高级功能 3：标准 JSON 备份文件反向载入
+        const fileInput = document.getElementById('import-file-input');
+        document.getElementById('btn-import-json-trigger').addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const parsed = JSON.parse(evt.target.result);
+                    if (Array.isArray(parsed)) {
+                        rules = parsed;
+                        saveToLocalStorage();
+                        renderRules();
+                        updateAllCommands();
+                        document.getElementById('io-panel').classList.remove('active');
+                        alert('JSON 配置导入还原成功！');
+                    } else {
+                        alert('解析失败：备份内容必须为合规的 JSON 数组结构。');
+                    }
+                } catch(err) {
+                    alert('导入失败，请确保该文件为标准的纯文本 JSON 数据。');
+                }
+            };
+            reader.readAsText(file);
+            fileInput.value = ''; 
+        });
+
+        document.getElementById('clear_rules').addEventListener('change', () => { saveToLocalStorage(); updateAllCommands(); });
+        document.getElementById('enable_tcp').addEventListener('change', () => { saveToLocalStorage(); updateAllCommands(); });
+        document.getElementById('enable_udp').addEventListener('change', () => { saveToLocalStorage(); updateAllCommands(); });
+        document.getElementById('delete-port').addEventListener('input', () => { saveToLocalStorage(); updateAllCommands(); });
+
+        document.getElementById('gen-install').addEventListener('click', function() { currentManagementCmd = generateActionCmd('install'); updateAllCommands(); });
+        document.getElementById('gen-update').addEventListener('click', function() { currentManagementCmd = generateActionCmd('update'); updateAllCommands(); });
+        document.getElementById('gen-uninstall').addEventListener('click', function() { currentManagementCmd = generateActionCmd('uninstall'); updateAllCommands(); });
+
+        document.getElementById('copy-all-btn').addEventListener('click', function() {
+            const cmdItems = document.querySelectorAll('.cmd-item .cmd-text');
+            const texts = Array.from(cmdItems).map(el => el.textContent.trim());
+            const fullText = texts.join('\n');
+            if (fullText) copyToClipboard(fullText, this);
+        });
+
+        loadFromLocalStorage();
+        renderRules();
+        updateAllCommands();
+    })();
+</script>
+</body>
+</html>
