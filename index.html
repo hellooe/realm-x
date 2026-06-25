@@ -107,7 +107,7 @@
         .bal-container input { width: 90px; padding: 4px 8px; font-size: 13px; text-align: center; }
 
         /* 按钮体系 */
-        .btn { padding: 8px 16px; border: none; border-radius: var(--radius-sm); font-weight: 500; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); user-select: none; }
+        .btn { padding: 8px 16px; border: none; border-radius: var(--radius-sm); font-weight: 500; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); user-select: none; text-decoration: none; }
         .btn-primary { background: var(--primary); color: #fff; }
         .btn-primary:hover { background: var(--primary-hover); }
         .btn-secondary { background: var(--border); color: var(--text); }
@@ -171,7 +171,10 @@
 <div class="container">
     <div class="header-area">
         <h1>🔁 Realm 规则生成器</h1>
-        <button class="btn btn-secondary btn-sm" id="theme-toggle">🌓 切换主题</button>
+        <div class="btn-group">
+            <a href="https://github.com/hellooe/realm-x" target="_blank" class="btn btn-secondary btn-sm">🐈 GitHub 仓库</a>
+            <button class="btn btn-secondary btn-sm" id="theme-toggle">🌓 切换主题</button>
+        </div>
     </div>
     <div class="sub">可视化的 Realm 配置面板。</div>
 
@@ -273,11 +276,6 @@
             if(!a) return false;
             if(a.includes(' ') || a.includes('\n')) return false;
             return true;
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         }
 
         function joinAddrPort(addr, port) {
@@ -497,7 +495,6 @@
                 });
                 extraListDiv.appendChild(extraItemContainer);
 
-                // 负载均衡策略组
                 if (extras.length > 0) {
                     const balDiv = document.createElement('div');
                     balDiv.className = 'bal-container';
@@ -685,7 +682,7 @@
 
                 const textSpan = document.createElement('span');
                 textSpan.className = 'cmd-text';
-                textSpan.textContent = item.cmd; 
+                textSpan.textContent = item.cmd;
 
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'cmd-copy-btn';
@@ -734,7 +731,6 @@
             document.body.removeChild(textarea);
         }
 
-        // ⚡ 核心高级功能 1：多行任意文本智能批量切分载入
         document.getElementById('btn-parse-bulk').addEventListener('click', () => {
             const rawText = document.getElementById('bulk-paste-area').value.trim();
             if(!rawText) return;
@@ -746,10 +742,8 @@
                 const cleanLine = line.trim();
                 if(!cleanLine) return;
                 
-                // 依据冒号切分段数
                 const segments = cleanLine.split(':');
                 if(segments.length === 3) {
-                    // 格式： 监听端口:目标IP:目标端口
                     rules.push({
                         listen_addr: '0.0.0.0',
                         listen_port: segments[0].trim(),
@@ -761,7 +755,6 @@
                     });
                     newlyAddedCount++;
                 } else if(segments.length === 4) {
-                    // 格式： 监听IP:监听端口:目标IP:目标端口
                     rules.push({
                         listen_addr: segments[0].trim(),
                         listen_port: segments[1].trim(),
@@ -786,7 +779,6 @@
             }
         });
 
-        // ⚡ 核心高级功能 2：标准 JSON 配置文件物理导出
         document.getElementById('btn-export-json').addEventListener('click', () => {
             if(rules.length === 0) { alert('当前没有配置可供导出备份'); return; }
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rules, null, 2));
@@ -798,7 +790,6 @@
             downloadAnchor.remove();
         });
 
-        // ⚡ 核心高级功能 3：标准 JSON 备份文件反向载入
         const fileInput = document.getElementById('import-file-input');
         document.getElementById('btn-import-json-trigger').addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', (e) => {
@@ -823,7 +814,7 @@
                 }
             };
             reader.readAsText(file);
-            fileInput.value = ''; 
+            fileInput.value = '';
         });
 
         document.getElementById('clear_rules').addEventListener('change', () => { saveToLocalStorage(); updateAllCommands(); });
