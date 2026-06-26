@@ -22,13 +22,16 @@ NETWORK_FILE="$NETWORK_DIR/network.json"
 LOG_FILE="$LOG_DIR/realm.log"
 REALM_BIN="$BIN_DIR/realm"
 
+TG_CONFIG_FILE="$CONF_DIR/tg.json"
+CRON_IDENT="# realm-xm-test"
+
 RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[0;33m' NC='\033[0m'
 
 install_deps() {
     echo -e "${YELLOW}[INFO] 安装依赖 ...${NC}"
-    (apt install -y curl tar net-tools iproute2 jq netcat-openbsd coreutils 2>/dev/null ||
-     yum install -y curl tar net-tools iproute jq nmap-ncat coreutils 2>/dev/null ||
-     apk add curl tar net-tools iproute2 jq netcat-openbsd coreutils 2>/dev/null) || {
+    (apt install -y curl tar net-tools iproute2 jq netcat-openbsd coreutils cron 2>/dev/null ||
+     yum install -y curl tar net-tools iproute jq nmap-ncat coreutils cronie 2>/dev/null ||
+     apk add curl tar net-tools iproute2 jq netcat-openbsd coreutils cronie 2>/dev/null) || {
         echo -e "${RED}[ERROR] 依赖安装失败${NC}"
         exit 1
     }
@@ -207,7 +210,7 @@ EOF
   "listen": "$listen",
   "remote": "$remote",
   "extra_remotes": $extra_remotes,
-  "balance": "$balance"
+  "balance": $balance
 }
 EOF
     fi
@@ -250,7 +253,7 @@ expand_ports() {
                     ports+=("$p")
                 done
             else
-                echo -e "${RED}[ERROR] 端口范围错误: $part${NC}" >&2
+                echo -e "${RED}[ERROR] 端口 range 错误: $part${NC}" >&2
                 exit 1
             fi
         else
@@ -263,18 +266,14 @@ expand_ports() {
 
 validate_addr() {
     local addr=$1
-    if [[ ! "$addr" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+$ ]] && \
-       [[ ! "$addr" =~ ^\[[0-9a-fA-F:]+\]:[0-9]+$ ]] && \
-       [[ ! "$addr" =~ ^[0-9a-fA-F:]+:[0-9]+$ ]]; then
-        echo -e "${RED}[ERROR] 地址格式错误，应为 IP:PORT 或 [IPv6]:PORT${NC}" >&2
-        return 1
+    if [[ "$addr" =~ ^\[[^]]+\]:[0-9]+$ ]] || [[ "$addr" =~ ^[^:]+:[0-9]+$ ]]; then
+        local port=${addr##*:}
+        if [[ $port -ge 1 && $port -le 65535 ]]; then
+            return 0
+        fi
     fi
-    local port=${addr##*:}
-    if [[ $port -lt 1 || $port -gt 65535 ]]; then
-        echo -e "${RED}[ERROR] 端口号必须在 1-65535 之间${NC}" >&2
-        return 1
-    fi
-    return 0
+    echo -e "${RED}[ERROR] 地址格式错误，应为 IP:PORT、[IPv6]:PORT 或 domain:PORT${NC}" >&2
+    return 1
 }
 
 validate_strategy() {
@@ -286,6 +285,7 @@ validate_strategy() {
 validate_weights() {
     local weights_str=$1
     local extra_count=$2
+    weights_str=$(echo "$weights_str" | tr -d ' ')
     IFS=',' read -ra w_arr <<< "$weights_str"
     local count=${#w_arr[@]}
     local expected=$((extra_count + 1))
@@ -339,93 +339,6 @@ validate_endpoint() {
     return 0
 }
 
-test_remote() {
-    if [[ "${ENABLE_TCP:-}" == "false" ]]; then
-        echo -e "${YELLOW}[INFO] TCP 已全局禁用，跳过测试${NC}"
-        return 0
-    fi
-
-    local addr=$1
-    local host port
-    if [[ "$addr" =~ ^\[([0-9a-fA-F:]+)\]:([0-9]+)$ ]]; then
-        host="${BASH_REMATCH[1]}"
-        port="${BASH_REMATCH[2]}"
-    elif [[ "$addr" =~ ^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):([0-9]+)$ ]]; then
-        host="${BASH_REMATCH[1]}"
-        port="${BASH_REMATCH[2]}"
-    elif [[ "$addr" =~ ^([0-9a-fA-F:]+):([0-9]+)$ ]]; then
-        host="${BASH_REMATCH[1]}"
-        port="${BASH_REMATCH[2]}"
-    else
-        echo -e "${YELLOW}[WARN] 无法解析地址: $addr，跳过测试${NC}"
-        return 1
-    fi
-
-    echo -e "${YELLOW}[INFO] 测试 $addr ...${NC}"
-    if command -v nc &>/dev/null; then
-        if nc -z -w 2 "$host" "$port" 2>/dev/null; then
-            echo -e "${GREEN}[INFO] 成功连接: $addr${NC}"
-            return 0
-        else
-            echo -e "${YELLOW}[WARN] 无法连接到 $addr${NC}"
-            return 1
-        fi
-    else
-        if timeout 2 bash -c "echo > /dev/tcp/$host/$port" 2>/dev/null; then
-            echo -e "${GREEN}[INFO] 成功连接: $addr${NC}"
-            return 0
-        else
-            echo -e "${YELLOW}[WARN] 无法连接到 $addr${NC}"
-            return 1
-        fi
-    fi
-}
-
-test_all_remotes() {
-    echo -e "${YELLOW}[INFO] 开始测试所有远程地址的连通性...${NC}"
-    local fail_count=0
-    local total=0
-    local failed_addrs=()
-
-    if ! ls "$ENDPOINTS_DIR"/*.json &>/dev/null; then
-        echo -e "${YELLOW}[INFO] 当前没有任何规则，无法测试。${NC}"
-        return
-    fi
-
-    for f in "$ENDPOINTS_DIR"/*.json; do
-        [[ -f "$f" ]] || continue
-        local rule_name=$(basename "$f")
-
-        local remote=$(jq -r '.remote' "$f")
-        if [[ -n "$remote" && "$remote" != "null" ]]; then
-            total=$((total+1))
-            if ! test_remote "$remote"; then
-                fail_count=$((fail_count+1))
-                failed_addrs+=("$remote (规则 $rule_name)")
-            fi
-        fi
-
-        local extras=$(jq -r '.extra_remotes[]? // empty' "$f")
-        for extra in $extras; do
-            total=$((total+1))
-            if ! test_remote "$extra"; then
-                fail_count=$((fail_count+1))
-                failed_addrs+=("$extra (规则 $rule_name)")
-            fi
-        done
-    done
-
-    echo -e "\n${YELLOW}[INFO] 测试完成，总计 $total 个远程地址，失败 $fail_count 个。${NC}"
-    if [[ $fail_count -eq 0 ]]; then
-        echo -e "${GREEN}所有远程地址均可达。${NC}"
-    else
-        echo -e "${RED}存在 $fail_count 个不可达地址:${NC}"
-        for addr in "${failed_addrs[@]}"; do
-            echo -e "  ${RED}✗${NC} $addr"
-        done
-    fi
-}
-
 add_rules() {
     [[ -z "${XM_ADD_JSON:-}" ]] && { echo -e "${RED}[ERROR] 需要 XM_ADD_JSON${NC}"; exit 1; }
 
@@ -438,10 +351,7 @@ add_rules() {
         fi
         listen=$(echo "$ep" | jq -r '.listen')
         port=$(echo "$listen" | awk -F: '{print $NF}')
-        if ! check_port "$port"; then
-            echo -e "${RED}[ERROR] 端口 $port 被占用${NC}" >&2
-            exit 1
-        fi
+        check_port "$port" || return 1
     done
 
     for ((i=0; i<len; i++)); do
@@ -539,7 +449,7 @@ add_rule_interactive() {
 
         local extra_count=${#extras[@]}
         while true; do
-            read -p "权重 (如 4,2,1，数量需为额外远程数+1): " weights
+            read -p "权重 (如 4,2,1): " weights
             validate_weights "$weights" "$extra_count" && break
         done
 
@@ -564,6 +474,193 @@ delete_rule_interactive() {
     service_ctl restart
 }
 
+load_tg_config() {
+    if [[ -n "${TG_BOT_TOKEN:-}" && -n "${TG_CHAT_ID:-}" ]]; then
+        return
+    fi
+    if [[ -f "$TG_CONFIG_FILE" ]]; then
+        TG_BOT_TOKEN=$(jq -r '.bot_token // ""' "$TG_CONFIG_FILE")
+        TG_CHAT_ID=$(jq -r '.chat_id // ""' "$TG_CONFIG_FILE")
+    else
+        TG_BOT_TOKEN=""
+        TG_CHAT_ID=""
+    fi
+}
+
+save_tg_config() {
+    local token="${1:-}"
+    local chat_id="${2:-}"
+    if [[ -z "$token" || -z "$chat_id" ]]; then
+        echo -e "${RED}[ERROR] Token 和 Chat ID 不能为空${NC}" >&2
+        return 1
+    fi
+    jq -n --arg token "$token" --arg chat "$chat_id" '{bot_token: $token, chat_id: $chat}' > "$TG_CONFIG_FILE"
+    echo -e "${GREEN}[INFO] TG 通知配置已成功保存${NC}"
+}
+
+send_tg_message() {
+    local msg="$1"
+    load_tg_config
+    if [[ -z "$TG_BOT_TOKEN" || -z "$TG_CHAT_ID" ]]; then
+        echo -e "${YELLOW}[WARN] TG 未配置，无法发送消息${NC}" >&2
+        return 1
+    fi
+    local url="https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage"
+    local response=$(curl -s -X POST "$url" -d chat_id="$TG_CHAT_ID" -d text="$msg" -d parse_mode="Markdown")
+    if echo "$response" | grep -q '"ok":true'; then
+        echo -e "${GREEN}[INFO] TG 消息发送成功${NC}"
+    else
+        echo -e "${RED}[ERROR] TG 消息发送失败: $response${NC}" >&2
+        return 1
+    fi
+}
+
+setup_cron() {
+    local interval="$1"
+    local script_path=""
+    local notify=""
+    
+    if [[ "$0" =~ xm\.sh$ ]] && [[ -f "$0" ]]; then
+        script_path=$(realpath "$0")
+    else
+        script_path="$BIN_DIR/xm.sh"
+        if [[ ! -f "$script_path" ]]; then
+            echo -e "${YELLOW}[INFO] 检测到远程执行，正在下载管理脚本至本地...${NC}"
+            curl -Ls "https://raw.githubusercontent.com/hellooe/realm-x/refs/heads/master/xm.sh" -o "$script_path"
+            chmod +x "$script_path"
+        fi
+    fi
+
+    if [[ -n "${TG_NOTIFY:-}" ]]; then
+        notify="$TG_NOTIFY"
+    else
+        if [[ -f "$TG_CONFIG_FILE" ]] && jq -e '.bot_token != "" and .chat_id != ""' "$TG_CONFIG_FILE" >/dev/null 2>&1; then
+            notify="true"
+        else
+            notify="false"
+        fi
+    fi
+    
+    local cron_cmd="XM_ACTION=test TG_NOTIFY=$notify $script_path >> $LOG_DIR/test.log 2>&1 ; $CRON_IDENT"
+    crontab -l 2>/dev/null | grep -vF "$CRON_IDENT" | crontab - 2>/dev/null || true
+    (crontab -l 2>/dev/null; echo "$interval $cron_cmd") | crontab -
+    echo -e "${GREEN}[INFO] 定时任务已设置: $interval${NC}"
+}
+
+remove_cron() {
+    crontab -l 2>/dev/null | grep -vF "$CRON_IDENT" | crontab - 2>/dev/null || true
+    echo -e "${GREEN}[INFO] 定时任务已移除${NC}"
+}
+
+test_remote() {
+    if [[ "${ENABLE_TCP:-}" == "false" ]]; then
+        echo -e "${YELLOW}[INFO] TCP 已全局禁用，跳过测试${NC}"
+        return 0
+    fi
+
+    local addr=$1
+    local host port
+
+    if [[ "$addr" =~ ^\[([^]]+)\]:([0-9]+)$ ]]; then
+        host="${BASH_REMATCH[1]}"
+        port="${BASH_REMATCH[2]}"
+    elif [[ "$addr" =~ ^(.+):([0-9]+)$ ]]; then
+        host="${BASH_REMATCH[1]}"
+        port="${BASH_REMATCH[2]}"
+    else
+        echo -e "${YELLOW}[WARN] 无法解析地址: $addr，跳过测试${NC}"
+        return 1
+    fi
+
+    local connect_host="$host"
+    if [[ "$host" =~ : && ! "$host" =~ \. ]]; then
+        connect_host="[$host]"
+    fi
+
+    echo -e "${YELLOW}[INFO] 测试 $addr ...${NC}"
+    if command -v nc &>/dev/null; then
+        if nc -z -w 2 "$connect_host" "$port" 2>/dev/null; then
+            echo -e "${GREEN}[INFO] 成功连接: $addr${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}[WARN] 无法连接到 $addr${NC}"
+            return 1
+        fi
+    else
+        if timeout 2 bash -c "echo > /dev/tcp/$connect_host/$port" 2>/dev/null; then
+            echo -e "${GREEN}[INFO] 成功连接: $addr${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}[WARN] 无法连接到 $addr${NC}"
+            return 1
+        fi
+    fi
+}
+
+test_all_remotes() {
+    echo -e "${YELLOW}[INFO] 开始测试所有远程地址的连通性...${NC}"
+    local fail_count=0
+    local total=0
+    local failed_addrs=()
+
+    if ! ls "$ENDPOINTS_DIR"/*.json &>/dev/null; then
+        echo -e "${YELLOW}[INFO] 当前没有任何规则，无法测试。${NC}"
+        return
+    fi
+
+    for f in "$ENDPOINTS_DIR"/*.json; do
+        [[ -f "$f" ]] || continue
+        local rule_name=$(basename "$f")
+
+        local remote=$(jq -r '.remote' "$f")
+        if [[ -n "$remote" && "$remote" != "null" ]]; then
+            total=$((total+1))
+            if ! test_remote "$remote"; then
+                fail_count=$((fail_count+1))
+                failed_addrs+=("$remote (规则 $rule_name)")
+            fi
+        fi
+
+        local extras=$(jq -r '.extra_remotes[]? // empty' "$f")
+        for extra in $extras; do
+            total=$((total+1))
+            if ! test_remote "$extra"; then
+                fail_count=$((fail_count+1))
+                failed_addrs+=("$extra (规则 $rule_name)")
+            fi
+        done
+    done
+
+    echo -e "\n${YELLOW}[INFO] 测试完成，总计 $total 个远程地址，失败 $fail_count 个。${NC}"
+    if [[ $fail_count -eq 0 ]]; then
+        echo -e "${GREEN}所有远程地址均可达。${NC}"
+    else
+        echo -e "${RED}存在 $fail_count 个不可达地址:${NC}"
+        for addr in "${failed_addrs[@]}"; do
+            echo -e "  ${RED}✗${NC} $addr"
+        done
+    fi
+
+    local summary="测试完成，总计 $total 个远程地址，失败 $fail_count 个。"
+    if [[ $fail_count -eq 0 ]]; then
+        summary+=" 所有远程地址均可达。"
+    else
+        summary+=" 存在 $fail_count 个不可达地址: "
+        for addr in "${failed_addrs[@]}"; do
+            summary+="$addr; "
+        done
+    fi
+
+    if [[ "${TG_NOTIFY:-false}" == "true" ]]; then
+        load_tg_config
+        if [[ -n "$TG_BOT_TOKEN" && -n "$TG_CHAT_ID" ]]; then
+            send_tg_message "$summary"
+        else
+            echo -e "${YELLOW}[WARN] TG 未配置，无法发送消息${NC}" >&2
+        fi
+    fi
+}
+
 if [[ -n "${XM_ACTION:-}" ]]; then
     case "$XM_ACTION" in
         install)   install_realm ;;
@@ -571,6 +668,19 @@ if [[ -n "${XM_ACTION:-}" ]]; then
         uninstall) uninstall_realm ;;
         add)       add_rules ;;
         delete)    delete_rule ;;
+        test)      
+            if [[ -n "${TG_BOT_TOKEN:-}" && -n "${TG_CHAT_ID:-}" ]]; then
+                save_tg_config "$TG_BOT_TOKEN" "$TG_CHAT_ID"
+            fi
+
+            if [[ -n "${CRON_INTERVAL:-}" ]]; then
+                setup_cron "$CRON_INTERVAL"
+            elif [[ "${CRON_INTERVAL+set}" == "set" ]]; then
+                remove_cron
+            fi
+
+            test_all_remotes
+            ;;
         *) echo -e "${RED}[ERROR] 未知动作${NC}"; exit 1 ;;
     esac
 else
@@ -584,12 +694,14 @@ else
         echo "5. 添加规则"
         echo "6. 删除规则"
         echo "7. 测试远程连通性"
+        echo "8. 配置 TG 推送"
+        echo "9. 设置定时测试"
         echo "0. 退出"
-        read -p "请选择 [0-7]: " opt
+        read -p "请选择 [0-9]: " opt
         case $opt in
             1) install_realm ;;
             2) update_realm ;;
-            3) 
+            3)
                 read -p "确认卸载 Realm？（所有配置和数据将被删除）[y/N]: " confirm
                 if [[ "$confirm" =~ ^[Yy]$ ]]; then
                     uninstall_realm
@@ -601,6 +713,34 @@ else
             5) add_rule_interactive ;;
             6) delete_rule_interactive ;;
             7) test_all_remotes ;;
+            8) 
+                read -p "输入 Telegram Bot Token: " token
+                read -p "输入 Telegram Chat ID: " chat_id
+                save_tg_config "$token" "$chat_id"
+                ;;
+            9)
+                echo "设置定时测试间隔："
+                echo "1) 每小时"
+                echo "2) 每天"
+                echo "3) 每周"
+                echo "4) 自定义小时数（输入数字）"
+                echo "5) 禁用定时测试"
+                read -p "选择 [1-5]: " cron_opt
+                case $cron_opt in
+                    1) setup_cron "0 * * * *" ;;
+                    2) setup_cron "0 0 * * *" ;;
+                    3) setup_cron "0 0 * * 0" ;;
+                    4) read -p "输入小时数（如 6 表示每6小时）: " hour
+                       if [[ "$hour" =~ ^[0-9]+$ ]] && [ $hour -gt 0 ]; then
+                           setup_cron "0 */$hour * * *"
+                       else
+                           echo -e "${RED}[ERROR] 请输入有效的正整数${NC}"
+                       fi
+                       ;;
+                    5) remove_cron ;;
+                    *) echo -e "${RED}无效选项${NC}" ;;
+                esac
+                ;;
             0) exit 0 ;;
             *) echo "无效选项" ;;
         esac
