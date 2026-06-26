@@ -73,9 +73,8 @@
         input[type="text"]:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--input-focus); }
         input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
         
-        /* 错误验证状态 */
-        input.invalid-field { border-color: var(--danger) !important; background-color: rgba(239, 68, 68, 0.05) !important; }
-        input.invalid-field:focus { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important; }
+        /* 错误验证状态标红 */
+        input.invalid-field, select.invalid-field { border-color: var(--danger) !important; background-color: rgba(239, 68, 68, 0.05) !important; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important; }
 
         /* 规则卡片设计 */
         .rule-item { background: var(--rule-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; margin-bottom: 16px; position: relative; transition: var(--transition); display: flex; flex-direction: column; }
@@ -104,7 +103,7 @@
         .bal-container { display: flex; align-items: center; gap: 12px; margin-top: 12px; background: var(--input-bg); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px dashed var(--border); font-size: 13px; width: max-content; flex-wrap: wrap; }
         .bal-container label { font-weight: 500; color: var(--text-muted); }
         .bal-container select { width: 130px; padding: 4px 8px; font-size: 13px; }
-        .bal-container input { width: 90px; padding: 4px 8px; font-size: 13px; text-align: center; }
+        .bal-container input { width: 110px; padding: 4px 8px; font-size: 13px; text-align: center; }
 
         /* 按钮体系 */
         .btn { padding: 8px 16px; border: none; border-radius: var(--radius-sm); font-weight: 500; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); user-select: none; text-decoration: none; }
@@ -148,6 +147,7 @@
         .cmd-empty { color: #475569; font-style: italic; font-size: 13px; text-align: center; padding: 20px 0; width: 100%; }
 
         .delete-section { border-top: 1px dashed var(--border); }
+        .test-section { border-top: 1px dashed var(--border); }
 
         /* 隐藏的文件输入框 */
         #import-file-input { display: none; }
@@ -197,14 +197,14 @@
 
     <div class="section">
         <div class="section-title">
-            <span>📋 转发规则配置</span>
+            <span>📋 配置转发规则</span>
             <div class="btn-group">
                 <button class="btn btn-secondary btn-sm" id="toggle-io-btn">⚡ 批量粘贴/高级功能</button>
             </div>
         </div>
 
         <div class="io-panel" id="io-panel">
-            <textarea class="io-textarea" id="bulk-paste-area" placeholder="【多行文本快捷解析导入】格式支持：&#10;监听端口:目标IP:目标端口  (默认监听 0.0.0.0)&#10;监听IP:监听端口:目标IP:目标端口&#10;10005:1.2.3.4:20005&#10;127.0.0.1:10006:8.8.8.8:53"></textarea>
+            <textarea class="io-textarea" id="bulk-paste-area" placeholder="【多行文本快捷解析导入】格式支持：&#10;监听端口:目标IP:目标端口(默认监听 0.0.0.0)&#10;监听IP:监听端口:目标IP:目标端口&#10;【注意】IPv6 地址需加方括号，如：&#10;10005:[2001:db8::1]:20005"></textarea>
             <div class="btn-group">
                 <button class="btn btn-success btn-sm" id="btn-parse-bulk">解析并载入多行文本</button>
                 <button class="btn btn-primary btn-sm" id="btn-export-json">导出备份 JSON 文件</button>
@@ -215,10 +215,10 @@
 
         <div id="rules-container" style="margin-top: 14px;"></div>
         <div style="margin-top: 16px;">
-            <button class="btn btn-success" id="add-rule-btn">➕ 添加一条转发规则映射</button>
+            <button class="btn btn-success" id="add-rule-btn">➕ 添加一条转发规则</button>
         </div>
         <div class="form-row" style="margin-top:16px; padding-top:12px; border-top: 1px solid var(--border);">
-            <label><input type="checkbox" id="clear_rules" checked> 清空现有配置规则后添加</label>
+            <label><input type="checkbox" id="clear_rules" checked> 清空 realm 现有配置再添加</label>
         </div>
     </div>
 
@@ -226,8 +226,41 @@
         <div class="section-title">🗑️ 批量删除规则</div>
         <div class="form-row">
             <label style="flex-direction: column; align-items: flex-start; gap: 6px; width: 100%;">
-                <span style="font-size: 13px; color: var(--text-muted);">输入要移除的监听端口（支持逗号分隔或连字符范围，如：10001,10002,20001-20002）</span>
-                <input type="text" id="delete-port" placeholder="示例: 10001,20000-20010" style="max-width:400px;">
+                <span style="font-size: 13px; color: var(--text-muted);">输入要移除的监听端口（逗号分隔或连字符组合，如：10001,10002,20001-20002）</span>
+                <input type="text" id="delete-port" placeholder="10001,20000-20010" style="max-width:400px;">
+            </label>
+        </div>
+    </div>
+
+    <div class="section test-section">
+        <div class="section-title">🔍 测试与通知配置</div>
+        <div class="form-row" style="margin-bottom: 16px;">
+            <label style="flex: 1; min-width: 250px; flex-direction: column; align-items: flex-start; gap: 6px;">
+                <span style="font-size: 13px; color: var(--text-muted);">Telegram Bot Token</span>
+                <input type="text" id="tg_bot_token" placeholder="123456789:ABCdefGhI...">
+            </label>
+            <label style="flex: 1; min-width: 250px; flex-direction: column; align-items: flex-start; gap: 6px;">
+                <span style="font-size: 13px; color: var(--text-muted);">Telegram Chat ID</span>
+                <input type="text" id="tg_chat_id" placeholder="987654321 或 -100123456">
+            </label>
+        </div>
+        <div class="form-row">
+            <label style="flex-direction: column; align-items: flex-start; gap: 6px; width: 100%;">
+                <span style="font-size: 13px; color: var(--text-muted);">自动连通性测试周期</span>
+                <div style="display: flex; gap: 12px; align-items: center; width: 100%; max-width: 600px;">
+                    <select id="cron_preset" style="max-width: 320px;">
+                        <option value="none">暂不需要测试与通知</option>
+                        <option value="once">仅执行单次测试 (不配置定时任务)</option>
+                        <option value="hourly">每小时自动测试一次</option>
+                        <option value="daily">每天自动测试一次</option>
+                        <option value="weekly">每周自动测试一次</option>
+                        <option value="custom">自定义测试周期</option>
+                    </select>
+                    <div id="custom_hours_wrapper" style="display: none; align-items: center; gap: 6px;">
+                        <input type="text" id="custom_cron_hours" placeholder="6" style="width: 75px; text-align: center;">
+                        <span style="font-size: 14px;">小时</span>
+                    </div>
+                </div>
             </label>
         </div>
     </div>
@@ -252,6 +285,44 @@
         const RULES_CONTAINER = document.getElementById('rules-container');
         const CMD_LIST = document.getElementById('cmd-list');
 
+        const Validators = {
+            port: (str) => {
+                const p = parseInt(str.trim(), 10);
+                return !isNaN(p) && p >= 1 && p <= 65535 && String(p) === str.trim();
+            },
+            addr: (str) => {
+                return /^[a-zA-Z0-9\.\-_:\[\]]+$/.test(str.trim());
+            },
+            bulkPort: (str) => {
+                return /^\d+(-\d+)?(,\d+(-\d+)?)*$/.test(str.trim());
+            },
+            weights: (str) => {
+                return /^\d+(,\d+)*$/.test(str.trim());
+            }
+        };
+
+        function checkInput(inputEl, validatorFunc, errorMsg) {
+            if (!inputEl) return true;
+            const val = inputEl.value.trim();
+            
+            if (!val) {
+                inputEl.classList.remove('invalid-field');
+                inputEl.title = '';
+                return false; 
+            }
+
+            const isValid = validatorFunc(val);
+            if (!isValid) {
+                inputEl.classList.add('invalid-field');
+                inputEl.title = errorMsg;
+            } else {
+                inputEl.classList.remove('invalid-field');
+                inputEl.title = '';
+            }
+            return isValid;
+        }
+
+        // 初始化深浅主题
         const savedTheme = localStorage.getItem('realm_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.setAttribute('data-theme', savedTheme);
 
@@ -263,38 +334,32 @@
         });
 
         document.getElementById('toggle-io-btn').addEventListener('click', () => {
-            const panel = document.getElementById('io-panel');
-            panel.classList.toggle('active');
+            document.getElementById('io-panel').classList.toggle('active');
         });
-
-        function isValidPort(portStr) {
-            const p = parseInt(portStr.trim(), 10);
-            return !isNaN(p) && p >= 1 && p <= 65535 && String(p) === portStr.trim();
-        }
-        function isValidAddr(addrStr) {
-            const a = addrStr.trim();
-            if(!a) return false;
-            if(a.includes(' ') || a.includes('\n')) return false;
-            return true;
-        }
 
         function joinAddrPort(addr, port) {
             addr = addr.trim();
             port = port.trim();
             if (!addr) return '';
             if (!port) return addr;
-            if (addr.includes(':')) return `[${addr}]:${port}`;
+            if (addr.includes(':') && !addr.startsWith('[')) return `[${addr}]:${port}`;
             return `${addr}:${port}`;
         }
 
+        // 本地自动保存
         function saveToLocalStorage() {
             localStorage.setItem('realm_rules_data', JSON.stringify(rules));
             localStorage.setItem('realm_setting_tcp', document.getElementById('enable_tcp').checked);
             localStorage.setItem('realm_setting_udp', document.getElementById('enable_udp').checked);
             localStorage.setItem('realm_setting_clear', document.getElementById('clear_rules').checked);
             localStorage.setItem('realm_setting_del_port', document.getElementById('delete-port').value);
+            localStorage.setItem('realm_setting_tg_token', document.getElementById('tg_bot_token').value);
+            localStorage.setItem('realm_setting_tg_chat_id', document.getElementById('tg_chat_id').value);
+            localStorage.setItem('realm_setting_cron_preset', document.getElementById('cron_preset').value);
+            localStorage.setItem('realm_setting_cron_hours', document.getElementById('custom_cron_hours').value);
         }
 
+        // 恢复本地存储数据
         function loadFromLocalStorage() {
             try {
                 const storedRules = localStorage.getItem('realm_rules_data');
@@ -308,8 +373,48 @@
                     document.getElementById('clear_rules').checked = localStorage.getItem('realm_setting_clear') === 'true';
                 if(localStorage.getItem('realm_setting_del_port') !== null) 
                     document.getElementById('delete-port').value = localStorage.getItem('realm_setting_del_port');
+                if(localStorage.getItem('realm_setting_tg_token') !== null) 
+                    document.getElementById('tg_bot_token').value = localStorage.getItem('realm_setting_tg_token');
+                if(localStorage.getItem('realm_setting_tg_chat_id') !== null) 
+                    document.getElementById('tg_chat_id').value = localStorage.getItem('realm_setting_tg_chat_id');
+                if(localStorage.getItem('realm_setting_cron_preset') !== null) 
+                    document.getElementById('cron_preset').value = localStorage.getItem('realm_setting_cron_preset');
+                if(localStorage.getItem('realm_setting_cron_hours') !== null) 
+                    document.getElementById('custom_cron_hours').value = localStorage.getItem('realm_setting_cron_hours');
+                
+                syncCustomHoursWrapper();
             } catch(e) {
-                console.error("加载缓存数据失败，已重置", e);
+                console.error("加载缓存数据失败", e);
+            }
+        }
+
+        function syncCustomHoursWrapper() {
+            const preset = document.getElementById('cron_preset').value;
+            const wrapper = document.getElementById('custom_hours_wrapper');
+            if (preset === 'custom') {
+                wrapper.style.display = 'flex';
+            } else {
+                wrapper.style.display = 'none';
+            }
+        }
+
+        function syncWeightsValidation(itemDiv, index) {
+            const weightsInp = itemDiv.querySelector('.bal-weights');
+            if (!weightsInp) return;
+
+            let activeEndpointsCount = 0;
+            if(Validators.addr(rules[index].remote_addr) && Validators.port(rules[index].remote_port)) activeEndpointsCount++;
+            (rules[index].extra_remotes || []).forEach(item => {
+                if (Validators.addr(item.addr) && Validators.port(item.port)) activeEndpointsCount++;
+            });
+
+            const isSyntaxValid = checkInput(weightsInp, Validators.weights, "权重格式错误！仅允许纯数字与英文逗号（如: 4,2,1）");
+            if (isSyntaxValid) {
+                const weightElements = weightsInp.value.split(',').map(w => w.trim()).filter(w => w !== '');
+                if (weightElements.length !== activeEndpointsCount) {
+                    weightsInp.classList.add('invalid-field');
+                    weightsInp.title = `项数不配！当前填写的权重个数(${weightElements.length})与该条规则中真正合法的转发目标总数(${activeEndpointsCount})不一致，强行运行会导致 Realm 节点崩溃！`;
+                }
             }
         }
 
@@ -322,7 +427,7 @@
                 const fieldsDiv = document.createElement('div');
                 fieldsDiv.className = 'rule-fields';
 
-                // 1. 监听端组件设计
+                // 监听组
                 const listenGroup = document.createElement('div');
                 listenGroup.className = 'rule-group';
                 
@@ -345,8 +450,8 @@
                 listenPortInp.value = rule.listen_port || '';
                 listenPortInp.placeholder = '端口';
                 
-                if(rule.listen_port && !isValidPort(rule.listen_port)) listenPortInp.classList.add('invalid-field');
-                if(rule.listen_addr && !isValidAddr(rule.listen_addr)) listenAddrInp.classList.add('invalid-field');
+                checkInput(listenPortInp, Validators.port, "端口格式错误！");
+                checkInput(listenAddrInp, Validators.addr, "IP/域名包含非法字符！");
 
                 listenCombined.appendChild(listenAddrInp);
                 listenCombined.appendChild(listenPortInp);
@@ -354,7 +459,7 @@
                 listenGroup.appendChild(listenCombined);
                 fieldsDiv.appendChild(listenGroup);
 
-                // 2. 远端出口组件设计
+                // 远程组
                 const remoteGroup = document.createElement('div');
                 remoteGroup.className = 'rule-group';
                 
@@ -377,8 +482,8 @@
                 remotePortInp.value = rule.remote_port || '';
                 remotePortInp.placeholder = '端口';
                 
-                if(rule.remote_port && !isValidPort(rule.remote_port)) remotePortInp.classList.add('invalid-field');
-                if(rule.remote_addr && !isValidAddr(rule.remote_addr)) remoteAddrInp.classList.add('invalid-field');
+                checkInput(remotePortInp, Validators.port, "端口格式错误！");
+                checkInput(remoteAddrInp, Validators.addr, "IP/域名包含非法字符！");
 
                 remoteCombined.appendChild(remoteAddrInp);
                 remoteCombined.appendChild(remotePortInp);
@@ -388,7 +493,7 @@
 
                 itemDiv.appendChild(fieldsDiv);
 
-                // 3. 负载均衡模块
+                // 负载均衡模块
                 const extraDiv = document.createElement('div');
                 extraDiv.className = 'extra-remotes';
 
@@ -433,7 +538,7 @@
 
                 const extraItemContainer = document.createElement('div');
                 extraItemContainer.className = 'extra-item-container';
-                
+
                 extras.forEach((item, ei) => {
                     const itemDivChild = document.createElement('div');
                     itemDivChild.className = 'extra-item';
@@ -453,8 +558,8 @@
                     childPortInp.value = item.port || '';
                     childPortInp.placeholder = '端口';
 
-                    if(item.port && !isValidPort(item.port)) childPortInp.classList.add('invalid-field');
-                    if(item.addr && !isValidAddr(item.addr)) childAddrInp.classList.add('invalid-field');
+                    checkInput(childPortInp, Validators.port, "端口号格式错误！");
+                    checkInput(childAddrInp, Validators.addr, "IP 包含非法字符！");
 
                     const delExtraBtn = document.createElement('button');
                     delExtraBtn.className = 'del-extra-btn';
@@ -473,13 +578,13 @@
                     const updateExtra = () => {
                         rules[index].extra_remotes[ei].addr = childAddrInp.value.trim();
                         rules[index].extra_remotes[ei].port = childPortInp.value.trim();
+                        
+                        checkInput(childPortInp, Validators.port, "端口号格式错误！");
+                        checkInput(childAddrInp, Validators.addr, "IP 包含非法字符！");
+                        syncWeightsValidation(itemDiv, index);
+
                         saveToLocalStorage();
                         updateAllCommands();
-                        
-                        if(childPortInp.value && !isValidPort(childPortInp.value)) childPortInp.classList.add('invalid-field');
-                        else childPortInp.classList.remove('invalid-field');
-                        if(childAddrInp.value && !isValidAddr(childAddrInp.value)) childAddrInp.classList.add('invalid-field');
-                        else childAddrInp.classList.remove('invalid-field');
                     };
                     childAddrInp.addEventListener('input', updateExtra);
                     childPortInp.addEventListener('input', updateExtra);
@@ -495,6 +600,7 @@
                 });
                 extraListDiv.appendChild(extraItemContainer);
 
+                // 负载均衡策略组
                 if (extras.length > 0) {
                     const balDiv = document.createElement('div');
                     balDiv.className = 'bal-container';
@@ -509,7 +615,7 @@
                             <option value="iphash">iphash (源IP固定哈希)</option>
                         </select>
                         <label style="margin-left:8px;">权重配置</label>
-                        <input type="text" class="bal-weights" placeholder="例如: 1,1,1">
+                        <input type="text" class="bal-weights" placeholder="1,1,1">
                     `;
                     
                     const strategySel = balDiv.querySelector('.bal-strategy');
@@ -517,11 +623,27 @@
                     const weightsInp = balDiv.querySelector('.bal-weights');
                     weightsInp.value = weightsVal;
 
+                    let activeEndpointsCount = 0;
+                    if(Validators.addr(rule.remote_addr) && Validators.port(rule.remote_port)) activeEndpointsCount++;
+                    extras.forEach(item => {
+                        if (Validators.addr(item.addr) && Validators.port(item.port)) activeEndpointsCount++;
+                    });
+                    const isSyntaxValid = checkInput(weightsInp, Validators.weights, "权重格式错误！仅允许纯数字与英文逗号（如: 4,2,1）");
+                    if (isSyntaxValid) {
+                        const weightElements = weightsInp.value.split(',').map(w => w.trim()).filter(w => w !== '');
+                        if (weightElements.length !== activeEndpointsCount) {
+                            weightsInp.classList.add('invalid-field');
+                            weightsInp.title = `当前填写的权重个数(${weightElements.length})与该条规则中转发目标总数(${activeEndpointsCount})不一致，会导致 Realm 节点崩溃！`;
+                        }
+                    }
+
                     const updateBal = () => {
                         rules[index].balance = {
                             strategy: strategySel.value,
                             weights: weightsInp.value.trim() || '1'
                         };
+                        
+                        syncWeightsValidation(itemDiv, index);
                         saveToLocalStorage();
                         updateAllCommands();
                     };
@@ -550,18 +672,12 @@
                     rules[index].listen_port = listenPortInp.value.trim();
                     rules[index].remote_addr = remoteAddrInp.value.trim();
                     rules[index].remote_port = remotePortInp.value.trim();
-
-                    if(listenPortInp.value && !isValidPort(listenPortInp.value)) listenPortInp.classList.add('invalid-field');
-                    else listenPortInp.classList.remove('invalid-field');
                     
-                    if(remotePortInp.value && !isValidPort(remotePortInp.value)) remotePortInp.classList.add('invalid-field');
-                    else remotePortInp.classList.remove('invalid-field');
-
-                    if(listenAddrInp.value && !isValidAddr(listenAddrInp.value)) listenAddrInp.classList.add('invalid-field');
-                    else listenAddrInp.classList.remove('invalid-field');
-
-                    if(remoteAddrInp.value && !isValidAddr(remoteAddrInp.value)) remoteAddrInp.classList.add('invalid-field');
-                    else remoteAddrInp.classList.remove('invalid-field');
+                    checkInput(listenPortInp, Validators.port, "端口格式错误！");
+                    checkInput(listenAddrInp, Validators.addr, "IP/域名包含非法字符！");
+                    checkInput(remotePortInp, Validators.port, "端口格式错误！");
+                    checkInput(remoteAddrInp, Validators.addr, "IP/域名包含非法字符！");
+                    syncWeightsValidation(itemDiv, index);
 
                     saveToLocalStorage();
                     updateAllCommands();
@@ -617,7 +733,7 @@
             const validRules = rules.filter(r => {
                 const listen = joinAddrPort(r.listen_addr, r.listen_port);
                 const remote = joinAddrPort(r.remote_addr, r.remote_port);
-                return listen && remote && isValidPort(r.listen_port) && isValidPort(r.remote_port);
+                return listen && remote && Validators.port(r.listen_port) && Validators.port(r.remote_port) && Validators.addr(r.listen_addr) && Validators.addr(r.remote_addr);
             });
             if (validRules.length === 0) return '';
 
@@ -627,12 +743,20 @@
                 const ep = { listen, remote };
                 if (r.extra_remotes && r.extra_remotes.length > 0) {
                     const filtered = r.extra_remotes
-                        .filter(item => item.addr && item.port && isValidPort(item.port))
+                        .filter(item => item.addr && item.port && Validators.port(item.port) && Validators.addr(item.addr))
                         .map(item => joinAddrPort(item.addr, item.port));
                     if (filtered.length > 0) {
                         ep.extra_remotes = filtered;
-                        if (r.balance && r.balance.weights && r.balance.weights.trim() !== '') {
-                            ep.balance = `${r.balance.strategy}: ${r.balance.weights}`;
+                        
+                        let activeCount = 1 + filtered.length; 
+                        let wStr = (r.balance && r.balance.weights) ? r.balance.weights.trim() : '';
+                        let wArr = wStr.split(',').filter(w=>w!=='');
+                        
+                        if (r.balance && Validators.weights(wStr) && wArr.length === activeCount) {
+                            ep.balance = {
+                                strategy: r.balance.strategy,
+                                weights: r.balance.weights.split(',').map(w => parseInt(w.trim(), 10))
+                            };
                         }
                     }
                 }
@@ -647,9 +771,49 @@
             return `${envVars} bash <(curl -Ls https://raw.githubusercontent.com/hellooe/realm-x/refs/heads/master/xm.sh)`;
         }
 
+        function generateTestCmd() {
+            const token = document.getElementById('tg_bot_token').value.trim();
+            const chatId = document.getElementById('tg_chat_id').value.trim();
+            const preset = document.getElementById('cron_preset').value;
+            const customHours = document.getElementById('custom_cron_hours').value.trim();
+
+            if (preset === 'none' && !token && !chatId) return '';
+
+            let cronIntervalString = '';
+            if (preset === 'hourly') cronIntervalString = '0 * * * *';
+            else if (preset === 'daily') cronIntervalString = '0 0 * * *';
+            else if (preset === 'weekly') cronIntervalString = '0 0 * * 0';
+            else if (preset === 'custom') {
+                const hoursNum = parseInt(customHours, 10);
+                if (!isNaN(hoursNum) && hoursNum > 0) {
+                    cronIntervalString = `0 */${hoursNum} * * *`;
+                } else {
+                    cronIntervalString = '0 */6 * * *'; 
+                }
+            }
+            
+            const notifyVal = (token && chatId) ? 'true' : 'false';
+
+            return `XM_ACTION=test TG_BOT_TOKEN='${token}' TG_CHAT_ID='${chatId}' TG_NOTIFY='${notifyVal}' CRON_INTERVAL='${cronIntervalString}' bash <(curl -Ls https://raw.githubusercontent.com/hellooe/realm-x/refs/heads/master/xm.sh)`;
+        }
+
         function generateDeleteCmd() {
-            const port = document.getElementById('delete-port').value.trim();
-            if (!port) return '';
+            const portInput = document.getElementById('delete-port');
+            const port = portInput.value.trim();
+            if (!port) {
+                portInput.classList.remove('invalid-field');
+                return '';
+            }
+            
+            if (!Validators.bulkPort(port)) {
+                portInput.classList.add('invalid-field');
+                portInput.title = "格式错误！仅支持纯数字、英文逗号或连字符组，不能含空格。";
+                return ''; 
+            } else {
+                portInput.classList.remove('invalid-field');
+                portInput.title = "";
+            }
+            
             return `XM_ACTION=delete XM_DELETE_PORT="${port}" bash <(curl -Ls https://raw.githubusercontent.com/hellooe/realm-x/refs/heads/master/xm.sh)`;
         }
 
@@ -660,17 +824,19 @@
         function updateAllCommands() {
             const addCmd = generateAddCommand();
             const delCmd = generateDeleteCmd();
+            const testCmd = generateTestCmd();
 
             let items = [];
             if (currentManagementCmd) items.push({ label: '管理', cmd: currentManagementCmd });
             if (addCmd) items.push({ label: '添加', cmd: addCmd });
+            if (testCmd) items.push({ label: '测试', cmd: testCmd });
             if (delCmd) items.push({ label: '删除', cmd: delCmd });
 
             if (items.length === 0) {
                 CMD_LIST.innerHTML = '';
                 const emptyDiv = document.createElement('div');
                 emptyDiv.className = 'cmd-empty';
-                emptyDiv.textContent = '💡 暂无生成的执行命令。请在上方输入完整的端口和映射数据，错误的端口格式会被自动忽略。';
+                emptyDiv.textContent = '💡 暂无生成的执行命令。请在上方输入完整的端口和映射数据，格式不正确或包含不符合白名单字符的数据会被安全过滤。';
                 CMD_LIST.appendChild(emptyDiv);
                 return;
             }
@@ -686,7 +852,7 @@
 
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'cmd-copy-btn';
-                copyBtn.textContent = '📋 复制';
+                copyBtn.innerHTML = '📋 复制';
                 copyBtn.setAttribute('data-raw-cmd', item.cmd);
                 copyBtn.addEventListener('click', function() {
                     copyToClipboard(this.getAttribute('data-raw-cmd'), this);
@@ -742,12 +908,15 @@
                 const cleanLine = line.trim();
                 if(!cleanLine) return;
                 
-                const segments = cleanLine.split(':');
+                const segments = cleanLine.split(/:(?![^\[]*\])/);
                 if(segments.length === 3) {
+                    let remote = segments[1].trim();
+                    if (remote.startsWith('[') && remote.endsWith(']')) remote = remote.slice(1, -1);
+                    
                     rules.push({
                         listen_addr: '0.0.0.0',
                         listen_port: segments[0].trim(),
-                        remote_addr: segments[1].trim(),
+                        remote_addr: remote,
                         remote_port: segments[2].trim(),
                         extra_remotes: [],
                         _hasExtra: false,
@@ -755,10 +924,15 @@
                     });
                     newlyAddedCount++;
                 } else if(segments.length === 4) {
+                    let listen = segments[0].trim();
+                    let remote = segments[2].trim();
+                    if (listen.startsWith('[') && listen.endsWith(']')) listen = listen.slice(1, -1);
+                    if (remote.startsWith('[') && remote.endsWith(']')) remote = remote.slice(1, -1);
+
                     rules.push({
-                        listen_addr: segments[0].trim(),
+                        listen_addr: listen,
                         listen_port: segments[1].trim(),
-                        remote_addr: segments[2].trim(),
+                        remote_addr: remote,
                         remote_port: segments[3].trim(),
                         extra_remotes: [],
                         _hasExtra: false,
@@ -775,19 +949,21 @@
                 renderRules();
                 updateAllCommands();
             } else {
-                alert('未识别到有效格式，请检查粘贴的内容是否满足 [端口:IP:端口] 规范');
+                alert('未识别到任何有效映射。格式模板：\nIPv4 -> 80:1.1.1.1:80\nIPv6 -> 80:[2001:db8::1]:80');
             }
         });
 
         document.getElementById('btn-export-json').addEventListener('click', () => {
             if(rules.length === 0) { alert('当前没有配置可供导出备份'); return; }
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rules, null, 2));
+            const blob = new Blob([JSON.stringify(rules, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
             const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", `realm_rules_backup_${new Date().toISOString().slice(0,10)}.json`);
+            downloadAnchor.href = url;
+            downloadAnchor.download = `realm_rules_backup_${new Date().toISOString().slice(0,10)}.json`;
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
-            downloadAnchor.remove();
+            document.body.removeChild(downloadAnchor);
+            URL.revokeObjectURL(url);
         });
 
         const fileInput = document.getElementById('import-file-input');
@@ -821,10 +997,30 @@
         document.getElementById('enable_tcp').addEventListener('change', () => { saveToLocalStorage(); updateAllCommands(); });
         document.getElementById('enable_udp').addEventListener('change', () => { saveToLocalStorage(); updateAllCommands(); });
         document.getElementById('delete-port').addEventListener('input', () => { saveToLocalStorage(); updateAllCommands(); });
+        
+        document.getElementById('tg_bot_token').addEventListener('input', () => { saveToLocalStorage(); updateAllCommands(); });
+        document.getElementById('tg_chat_id').addEventListener('input', () => { saveToLocalStorage(); updateAllCommands(); });
+        
+        document.getElementById('cron_preset').addEventListener('change', () => { 
+            syncCustomHoursWrapper(); 
+            saveToLocalStorage(); 
+            updateAllCommands(); 
+        });
+        document.getElementById('custom_cron_hours').addEventListener('input', () => { 
+            saveToLocalStorage(); 
+            updateAllCommands(); 
+        });
 
-        document.getElementById('gen-install').addEventListener('click', function() { currentManagementCmd = generateActionCmd('install'); updateAllCommands(); });
-        document.getElementById('gen-update').addEventListener('click', function() { currentManagementCmd = generateActionCmd('update'); updateAllCommands(); });
-        document.getElementById('gen-uninstall').addEventListener('click', function() { currentManagementCmd = generateActionCmd('uninstall'); updateAllCommands(); });
+        function handleManagementToggle(action) {
+            const cmd = generateActionCmd(action);
+            if (currentManagementCmd === cmd) currentManagementCmd = ''; 
+            else currentManagementCmd = cmd; 
+            updateAllCommands();
+        }
+
+        document.getElementById('gen-install').addEventListener('click', function() { handleManagementToggle('install'); });
+        document.getElementById('gen-update').addEventListener('click', function() { handleManagementToggle('update'); });
+        document.getElementById('gen-uninstall').addEventListener('click', function() { handleManagementToggle('uninstall'); });
 
         document.getElementById('copy-all-btn').addEventListener('click', function() {
             const cmdItems = document.querySelectorAll('.cmd-item .cmd-text');
